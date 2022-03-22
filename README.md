@@ -4,11 +4,11 @@ A good reference for using GitHub is: [Let's Git started](https://happygitwithr.
 
 You will find chapters: 4, 12, 15 and 16 essential for getting started.
 
-
+## hi
 ## Creating the Projects GitHub page.
 
 1. Create a new repository on GitHub named “username.github.io”.  For me: “paulmbeaumont.github.io”
-2. From top menu, choose: Setting -> Pages and set Branch: main /(root)
+2. From top menu, choose: Setting -> Pages and set Branch: main  /(root)
 3. Click the green “Code” button and copy link.
 4. Open a new “Project” in RStudio” with the same name as your repository. Put this folder some place where you would like to keep it long-term.
 5. Download the “GitHubProjectPage” folder from the Canvas page and drag those files into your project folder. Note that the file extensions are: "index.md" etc. ".md" files are GitHub friendly and can be rendered in readable form on GitHub.
