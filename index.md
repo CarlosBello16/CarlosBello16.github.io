@@ -1,20 +1,14 @@
 ---
 layout: page
-title: Analysis of Economic Data
+title: Carlos Bello Website
 ---
 
-##  Projects
-<a> 
-<img src="pmb2.png" alt="pmb" width="250"/>
-</a>
+## Projects
 
-## Contact Information 
+<a> <img src="pmb2.png" alt="pmb" width="250"/> </a>
 
-Paul Beaumont<br/>
-Department of Economics<br/>
-Florida State University <br/>
-Tallahassee, Florida, 32306 <br/>
+## Contact Information
 
-[Email:beaumont@fsu.edu](mailto:beaumont@fsu.edu)
+Carlos Bello<br/> Economist<br/> Florida State University <br/> Tallahassee, Florida, 32306 <br/>
 
-[Web Page:](https://paulmbeaumont.netlify.app/)
+[Email:sebibello\@gmail.com](mailto:sebibello@gmail.com)
