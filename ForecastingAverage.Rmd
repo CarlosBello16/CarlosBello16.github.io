@@ -1,0 +1,194 @@
+---
+title: "Forecasting Average"
+author: "Carlos Bello"
+date: "`r format(Sys.Date(), '%B %d, %Y')` "
+output:
+  html_document:
+    df_print: paged
+    code_folding: "hide"
+    toc: yes
+    fig_caption: yes
+    theme: cosmo
+    toc_float: no
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+graphics.off()
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+
+This report showcases a comparison between different forecasting models that attempt to forecast the growth rate of inflation. Some variables will be used and plotted into a model with past values of growth rates of inflation to compare the efficacy of this different variables for this task.
+
+[Visit my personal website](CarlosBello16.github.io)
+
+``` {r DownloadPackages, message=FALSE}
+require(fpp3)
+require(tsibble)
+require(tidyverse)
+require(tidyquant)
+require(lubridate)
+require(timetk)
+require(kableExtra)
+require(seasonal)
+require(reshape)
+```
+
+# Reading in Data
+
+First, we will read in five different datasets to get the information that we need for the variables. These are pulled out from FRED and the portion of the data are from 1982 onwards, taken monthly. 
+
+1. Personal Consumption Expenditures: Chain-type Price Index (PCEPI)
+
+We will get the measurements of inflation from this
+
+2. 	Unemployment Rate
+
+3. 1-Year Expected Inflation
+
+4. Capacity Utilization: Total Index
+
+This is a measurement of the percent of maximum productive capacity that the nation is using.
+
+5. University of Michigan: Inflation Expectation
+``` {r ReadData, message=FALSE}
+varlist <- c('PCEPI', 'UNRATE', 'EXPINF1YR', 'MICH', 'TCU')
+RawData <- 
+  tq_get(varlist, get = "economic.data", from = '1982-01-01')
+
+Data <- RawData %>%
+  mutate(month= yearmonth(date), value = price) %>%
+  dplyr::select(-c(date, price)) %>% 
+  as_tsibble(index=month, key= symbol) %>%
+  pivot_wider(names_from = symbol, values_from = value) %>%
+  drop_na()
+```
+
+Here we do some transformation to the data to make it usable for our models
+``` {r LagData, message=FALSE}
+LagData <- Data %>% select(varlist) %>%
+  mutate(infl = 1200*log(PCEPI/lag(PCEPI))) %>%
+  mutate(dinfl= infl - lag(infl, 1)) %>%
+  mutate(dinfl12= 100*log(PCEPI/lag(PCEPI,12)) - lag(infl,12)) %>%
+  mutate(dunrate = UNRATE - lag(UNRATE)) %>%
+  mutate(dtcu = TCU - lag(TCU)) %>%
+  mutate(dEXPINF1YR = EXPINF1YR - lag(EXPINF1YR)) %>%
+  mutate(dMICH = MICH - lag(MICH)) %>%
+  select(-c(varlist)) %>% 
+  drop_na()
+
+train_data <- LagData %>% filter_index(~ "2019-12")
+test_data <- LagData %>% filter_index("2020-01" ~ .)
+
+LagDataLong <- LagData %>%
+  pivot_longer(!month, names_to = "Category", values_to = "Value")
+```
+
+# Model
+
+Here we fit our 4 linear models based upon the Stock & Watson (1999) specification of the Phillips curve, which attempts to forecast future inflation using past and current levels of inflation plus measurements of unemployment. The first model follows this exact specification, the other three replace the unemployment measurements with each of the other variables that we collected previously 
+
+Model PC uses unemployment measurements.
+
+Model TCU is using the Capacity Utilization Index.
+
+Model EXP is using the 1 Year Inflation Expectations.
+
+Model MICH is using the Inflation Expectation measurements gathered by the University of Michigan.
+``` {r FitModels, message= FALSE}
+fitALL <- train_data %>% 
+  model(
+    mPC = TSLM(dinfl12 ~ 1 +
+                 lag(dinfl,12) + lag(dinfl,13) + lag(dinfl,14) +
+                 lag(dinfl,15) + lag(dinfl,16) + lag(dinfl,17) +
+                 lag(dinfl,18) + lag(dinfl,19) + lag(dinfl,20) +
+                 lag(dinfl,21) + lag(dinfl,22) + lag(dinfl,23) +
+                 lag(dunrate,12) + lag(dunrate,13) + lag(dunrate,14) +
+                 lag(dunrate,15) + lag(dunrate,16) + lag(dunrate,17) +
+                 lag(dunrate,18) + lag(dunrate,19) + lag(dunrate,20) +
+                 lag(dunrate,21) + lag(dunrate,22) + lag(dunrate,23) 
+                 ) , 
+    mTCU = TSLM(dinfl12 ~ 1 +
+                 lag(dinfl,12) + lag(dinfl,13) + lag(dinfl,14) +
+                 lag(dinfl,15) + lag(dinfl,16) + lag(dinfl,17) +
+                 lag(dinfl,18) + lag(dinfl,19) + lag(dinfl,20) +
+                 lag(dinfl,21) + lag(dinfl,22) + lag(dinfl,23) +
+                 lag(dtcu,12) + lag(dtcu,13) + lag(dtcu,14) +
+                 lag(dtcu,15) + lag(dtcu,16) + lag(dtcu,17) +
+                 lag(dtcu,18) + lag(dtcu,19) + lag(dtcu,20) +
+                 lag(dtcu,21) + lag(dtcu,22) + lag(dtcu,23) 
+                 ) ,
+    mEXP = TSLM(dinfl12 ~ 1 +
+                 lag(dinfl,12) + lag(dinfl,13) + lag(dinfl,14) +
+                 lag(dinfl,15) + lag(dinfl,16) + lag(dinfl,17) +
+                 lag(dinfl,18) + lag(dinfl,19) + lag(dinfl,20) +
+                 lag(dinfl,21) + lag(dinfl,22) + lag(dinfl,23) +
+                 lag(dEXPINF1YR,12) + lag(dEXPINF1YR,13) + lag(dEXPINF1YR,14) +
+                 lag(dEXPINF1YR,15) + lag(dEXPINF1YR,16) + lag(dEXPINF1YR,17) +
+                 lag(dEXPINF1YR,18) + lag(dEXPINF1YR,19) + lag(dEXPINF1YR,20) +
+                 lag(dEXPINF1YR,21) + lag(dEXPINF1YR,22) + lag(dEXPINF1YR,23) 
+                 ) , 
+    mMICH = TSLM(dinfl12 ~ 1 +
+                 lag(dinfl,12) + lag(dinfl,13) + lag(dinfl,14) +
+                 lag(dinfl,15) + lag(dinfl,16) + lag(dinfl,17) +
+                 lag(dinfl,18) + lag(dinfl,19) + lag(dinfl,20) +
+                 lag(dinfl,21) + lag(dinfl,22) + lag(dinfl,23) +
+                 lag(dMICH,12) + lag(dMICH,13) + lag(dMICH,14) +
+                 lag(dMICH,15) + lag(dMICH,16) + lag(dMICH,17) +
+                 lag(dMICH,18) + lag(dMICH,19) + lag(dMICH,20) +
+                 lag(dMICH,21) + lag(dMICH,22) + lag(dMICH,23) 
+                 )
+  )
+tidy(fitALL)
+```
+## Measuring Accuracy
+
+Now lets see some measurements of accuracy during the training period of the model, which is the period where the model "trains" and attempts to parse out the relationship between
+our variables and future inflation.
+
+This numbers represent different metrics of the "error" of the model, meaning how far the models' predictions where from the actual inflation numbers during the training period. While this all give us some good bit of information, we want to focus on the RMSE and the MAE. These two are the ones that tell us more generally how "well" the model did. The lower the numbers the less error there was, roughly meaning the better the model did at getting the actual inflation values.
+
+In this case we can see that they all did similarly badly. These models are rather simplistic and will not be very good predictors of future inflation. We can see from this that the MICH model did do marginally better than the others.
+```{r AccuracyTest, message=FALSE}
+accuracy(fitALL)
+```
+
+```{r ResidualsGraphs, message=FALSE}
+fitALL %>% select(mMICH) %>% report()
+``` 
+
+These are a lot of graphics that gives us information on the characteristics of this errors. For the MICH model (and for the other ones as well) there is lots of over and under predictions that on average attempt to add to a small amount of error. As we can see in years like 2008 (the large through in the line graph) the inflation expectations were much higher than the actual inflation during that time. As we know the housing market crash brought a reduction of spending and of economic activity which led to less inflation than what was expected. 
+```{r ResidualsGraph, message = FALSE}
+fitALL %>% select(mMICH) %>% gg_tsresiduals()
+```
+
+# Ensemble Model
+
+This model combines all of the other models and average them out with equal weight. If the models were wildly different in accuracy we might want to weight the better ones more. In this case that is not necessary. The forecast graph shows the different models and how they differ from the actual inflation numbers (in black.) The unemployment model greatly overestimated the amount of inflation while the others were underestimating it. The ensemble model aggregates this and gives us an average as it can be seen in the red line. The color shades are the ranges of values where inflation could be at a 95% confidence.
+```{r EnsembleModel, message= FALSE}
+fit_combined <- fitALL %>%
+  mutate(ensemble = (mPC + mTCU + mEXP + mMICH)/4)
+fc_fit_combined <- fit_combined %>% forecast(new_data = test_data)
+
+fc_fit_combined %>% autoplot(filter(LagData, year(month) > 2016), level = c(95))
+```
+
+## Measuring Accuracy Part 2
+
+Here we showcase both the accuracy measures on the training period and the test period. The test period is where we tell the model to use the relationships that it understood from the data on the training period and to forecast inflation as the values of the variables in the model change. 
+
+As we said before, the MICH model did marginally better in the training period. Even than the created ensemble model (only by a very small difference.)
+
+The test period shows us a different picture, however. The EXP model did much better if we look at the Root Mean Squared Errors (RMSE.) This tells us that the EXP model was better at getting the mean of the actual inflation values. On the other hand, the ensemble model did the best with the Mean Absolute Error (MAE.) This means that the model did better at getting the median growth rate of inflation. 
+
+We can see that the MICH model did not perform great relative to our expectations from the testing period. These models are very simplistic so it is good to assume very high levels of variability on outcomes. In general ensemble models allows us to get predictions that are closer to actual values due to taking into its mix the different tendencies from the other models and averaging them out. 
+```{r AccuracyEnsamble, message= FALSE}
+accuracy(fit_combined)
+
+accuracy(fc_fit_combined, data = LagData)
+```
